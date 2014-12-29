@@ -129,7 +129,7 @@ class socket
          do
          {
             memset(_m_buffer, 0, sizeof(char) * BUFFER_SIZE);
-
+            
             _m_amount_read = ::read(_m_accepted_fd, _m_buffer, BUFFER_SIZE - 1);
 
             if (_m_amount_read < 0)
@@ -147,7 +147,7 @@ class socket
 
       void _write(const char* const message)
       {
-         int error_code = ::write(_m_accepted_fd, message, strlen(message));
+         int error_code = ::write(_m_accepted_fd, message, (std::size_t)strlen(message));
 
          if (error_code < 0)
          {
@@ -171,7 +171,7 @@ class socket
 
       int _m_accepted_fd;
       int _m_socket_fd;
-      std::size_t _m_amount_read;
+      int _m_amount_read;
       std::size_t _m_port_number;
 
       sockaddr_in _m_server_address;
