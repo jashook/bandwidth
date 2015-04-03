@@ -28,9 +28,19 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#if _WIN32
+
+#include <windows.h>
+#include <winsock.h>
+
+#pragma comment(lib, "Ws2_32.lib")
+
+#else // UNIX
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -38,6 +48,8 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -79,7 +91,11 @@ class socket
 
       void _accept()
       {
-         socklen_t client_length = sizeof(sockaddr_in);
+         #if _WIN32
+            int client_length = sizeof(sockaddr_in);
+         #else
+            socklen_t client_length = sizeof(sockaddr_in);
+         #endif
 
          _m_accepted_fd = ::accept(_m_socket_fd, (sockaddr *)&_m_client_address, &client_length);
 
@@ -92,7 +108,13 @@ class socket
             
             err += " -- ";
             
-            err += strerror(errno);
+            #if _WIN32
+               char buffer[256];
+
+               err += strerror_s(buffer, 256, errno);
+            #else
+               err += strerror(errno);
+            #endif
             
             throw std::runtime_error(err);
          }
@@ -119,6 +141,19 @@ class socket
 
       void _ctor(std::size_t port, const char* const ip = nullptr)
       {
+         #if _WIN32
+            WSADATA w;
+
+            int error = WSAStartup(0x0202, &w);
+
+            if (w.wVersion != 0x0202) //Wrong Winsock version?
+            {
+               WSACleanup();
+
+               throw std::runtime_error("[ev9::socket.hpp::_ctor()::140] - Incorrect WSA Version");
+            }
+         #endif
+
          _m_port_number = port;
          
          _m_ip_address = nullptr;
@@ -126,9 +161,27 @@ class socket
          if (ip != nullptr)
          {
             _m_ip_address = new char[std::strlen(ip) + 1];
-            std::strcpy(_m_ip_address, ip);
+
+            #if _WIN32
+               strcpy_s(_m_ip_address, std::strlen(ip) + 1, ip);
+            #else
+               std::strcpy(_m_ip_address, ip);
+            #endif
          }
-         
+
+         else
+         {
+            const char* loopback = "127.0.0.1";
+
+            _m_ip_address = new char[std::strlen(loopback) + 1];
+
+            #if _WIN32
+               strcpy_s(_m_ip_address, std::strlen(loopback) + 1, loopback);
+            #else
+               std::strcpy(_m_ip_address, ip);
+            #endif
+         }
+
          // AF_INET: Internet domain of the computer
          // SOCK_STREAM: TCP as opposed to UDP
          // 0: Choose TCP for the transfer protocol
@@ -153,7 +206,11 @@ class socket
    
       void _close()
       {
-         ::close(_m_socket_fd);
+         #if _WIN32
+            ::closesocket(_m_socket_fd);
+         #else
+            ::close(_m_socket_fd);
+         #endif
       }
    
       void _connect()
@@ -164,8 +221,12 @@ class socket
          
          if (_m_ip_address != nullptr)
          {
-            int status = ::inet_pton(AF_INET, _m_ip_address, &_m_server_address.sin_addr);
-            
+            #if _WIN32
+               int status = _m_server_address.sin_addr.s_addr = ::inet_addr(_m_ip_address);
+            #else
+               int status = ::inet_pton(AF_INET, _m_ip_address, &_m_server_address.sin_addr);
+            #endif
+
             if (status < 0)
             {
                throw std::runtime_error("Error cannot convert the ip address");
@@ -176,6 +237,8 @@ class socket
          
          if (return_value < 0)
          {
+            std::cout << WSAGetLastError() << std::endl;
+
             throw std::runtime_error("Error cannot connect to the address");
          }
 
@@ -185,7 +248,7 @@ class socket
       {
          if (_m_accepted_fd) close();
          if (_m_socket_fd) close();
-         if (_m_ip_address) delete _m_ip_address;
+         if (_m_ip_address) delete [] _m_ip_address;
       }
 
       void _listen()
@@ -200,7 +263,11 @@ class socket
          {
             memset(_m_buffer, 0, sizeof(char) * BUFFER_SIZE);
             
-            _m_amount_read = (int)::read(_m_accepted_fd, _m_buffer, BUFFER_SIZE - 1);
+            #if _WIN32
+               _m_amount_read = (int)::recv(_m_accepted_fd, _m_buffer, BUFFER_SIZE - 1, 0);
+            #else
+               _m_amount_read = (int)::read(_m_accepted_fd, _m_buffer, BUFFER_SIZE - 1);
+            #endif
 
             if (_m_amount_read < 0)
             {
@@ -221,7 +288,11 @@ class socket
          {
             memset(_m_buffer, 0, sizeof(char) * BUFFER_SIZE);
             
-            _m_amount_read = (int)::read(_m_socket_fd, _m_buffer, BUFFER_SIZE - 1);
+            #if _WIN32
+               _m_amount_read = (int)::recv(_m_socket_fd, _m_buffer, BUFFER_SIZE - 1, 0);
+            #else
+               _m_amount_read = (int)::read(_m_accepted_fd, _m_buffer, BUFFER_SIZE - 1);
+            #endif
             
             if (_m_amount_read < 0)
             {
@@ -238,7 +309,11 @@ class socket
    
       void _write(const char* const message)
       {
-         auto error_code = ::write(_m_socket_fd, message, (std::size_t)strlen(message));
+         #if _WIN32
+            auto error_code = ::send(_m_socket_fd, message, (std::size_t)strlen(message), 0);
+         #else
+            auto error_code = ::write(_m_socket_fd, message, (std::size_t)strlen(message));
+         #endif
       
          if (error_code < 0)
          {
@@ -248,7 +323,11 @@ class socket
 
       void _write(const std::string& message)
       {
-         auto error_code = ::write(_m_socket_fd, message.c_str(), message.size());
+         #if _WIN32
+            auto error_code = ::send(_m_socket_fd, message.c_str(), message.size(), 0);
+         #else
+            auto error_code = ::write(_m_socket_fd, message.c_str(), message.size());
+         #endif
 
          if (error_code < 0)
          {
@@ -258,8 +337,12 @@ class socket
 
       void _write_back(const char* const message)
       {
-         auto error_code = ::write(_m_accepted_fd, message, (std::size_t)strlen(message));
-         
+         #if _WIN32
+            auto error_code = ::send(_m_accepted_fd, message, (std::size_t)strlen(message), 0);
+         #else
+            auto error_code = ::write(_m_accepted_fd, message, (std::size_t)strlen(message));
+         #endif
+
          if (error_code < 0)
          {
             throw std::runtime_error("Error writing to the connection");
@@ -268,7 +351,11 @@ class socket
    
       void _write_back(const std::string& message)
       {
-         auto error_code = ::write(_m_accepted_fd, message.c_str(), message.size());
+         #if _WIN32
+            auto error_code = ::send(_m_accepted_fd, message.c_str(), message.size(), 0);
+         #else
+            auto error_code = ::write(_m_accepted_fd, message.c_str(), message.size());
+         #endif
          
          if (error_code < 0)
          {
@@ -281,13 +368,23 @@ class socket
       char _m_buffer[BUFFER_SIZE];
       char* _m_ip_address;
 
-      int _m_accepted_fd;
-      int _m_socket_fd;
-      int _m_amount_read;
+      #if _WIN32
+         SOCKET _m_accepted_fd;
+         SOCKET _m_socket_fd;
+      #else
+         int _m_accepted_fd;
+         int _m_socket_fd;
+      #endif
+         int _m_amount_read;
       std::size_t _m_port_number;
 
-      sockaddr_in _m_server_address;
-      sockaddr_in _m_client_address;
+      #if _WIN32
+         SOCKADDR_IN _m_server_address;
+         SOCKADDR_IN _m_client_address;
+      #else
+         sockaddr_in _m_server_addres;
+         sockaddr_in _m_client_address;
+      #endif 
 };
 
 ////////////////////////////////////////////////////////////////////////////////

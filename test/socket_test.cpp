@@ -33,16 +33,16 @@ void test_socket_ctor_dtor()
    
    try
    {
-      socket = new ev9::socket(7000);
+      socket = new ev9::socket(7006);
       
       socket->bind();
       
       delete socket;
    }
    
-   catch (...)
+   catch (std::exception& e)
    {
-      throw std::runtime_error(TEST_INFORMATION + std::string("unable to finish socket constructor"));
+      throw std::runtime_error(TEST_INFORMATION + std::string("unable to finish socket constructor.") + e.what());
    }
 }
 
@@ -73,7 +73,7 @@ void test_connect()
    ev9::socket* socket;
    
    // Sleep to allow the accept thread to finish.
-   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+   std::this_thread::sleep_for(std::chrono::milliseconds(100));
    
    try
    {
@@ -95,11 +95,11 @@ void test_connect_different_ip()
    ev9::socket* socket;
    
    // Sleep to allow the accept thread to finish.
-   std::this_thread::sleep_for(std::chrono::milliseconds(15));
+   std::this_thread::sleep_for(std::chrono::milliseconds(100));
    
    try
    {
-      socket = new ev9::socket("192.168.1.102", 7000);
+      socket = new ev9::socket("127.0.0.1", 7000);
       
       socket->connect();
       
@@ -148,7 +148,7 @@ void test_write()
    ev9::socket* socket;
    
    // Sleep to allow the accept thread to finish.
-   std::this_thread::sleep_for(std::chrono::milliseconds(10));
+   std::this_thread::sleep_for(std::chrono::milliseconds(100));
    
    try
    {
@@ -243,11 +243,11 @@ void test_read_write()
 int main()
 {
    ev9::test socket_test(0);
-    
+
    socket_test.add_test(test_socket_ctor_dtor);
    socket_test.add_test(test_accepting_connection);
-   socket_test.add_test(test_connect);
    socket_test.add_test(test_read);
+   socket_test.add_test(test_connect);
    socket_test.add_test(test_connect_different_ip);
    socket_test.add_test(test_write);
    socket_test.add_test(test_read_write);

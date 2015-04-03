@@ -33,7 +33,7 @@
 
 #define STR(num) #num
 
-#define TEST_INFORMATION std::string(__func__) + std::string(":") + std::string(std::to_string(__LINE__)) + std::string(" -- ")
+#define TEST_INFORMATION std::string(__FUNCTION__) + std::string(":") + std::string(std::to_string(__LINE__)) + std::string(" -- ")
 
 #define PRINT_TEST_INFORMATION printf("%s:%s:%d --", __FILE__, __func__, __LINE__);
 

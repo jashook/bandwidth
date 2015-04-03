@@ -265,16 +265,26 @@ class tester
    
       void _start_tests()
       {
-         std::size_t offset = (m_test_object->_m_task_list.size() / _m_thread_count) + 1;
-         
+         std::size_t offset = (m_test_object->_m_task_list.size() / _m_thread_count);
+         std::size_t remainder = (m_test_object->_m_task_list.size() % _m_thread_count);
+
+         std::size_t shift_number = 0;
+
          for (int i = 0; i < _m_thread_count && i < _m_task_list.size(); ++i)
          {
             m_test_object->_m_tasks[i]._m_task_list = _m_task_list;
-            m_test_object->_m_tasks[i]._m_start = i * offset;
+            m_test_object->_m_tasks[i]._m_start = i * offset + shift_number;
+
+            std::size_t end = (i * offset + shift_number) + offset;
+
+            if (remainder)
+            {
+               ++end; // add an extra to account for left overs
+               --remainder;
+               ++shift_number;
+            }
             
-            std::size_t end = (i * offset) + offset;
-            
-            if (end >= m_test_object->_m_task_list.size())
+            if (end > m_test_object->_m_task_list.size())
             {
                end = m_test_object->_m_task_list.size();
             }
